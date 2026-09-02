@@ -1,0 +1,2087 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1a2f" />
+    <title>蜂群星空互动 · 观众端</title>
+    <style>
+      /* ========== 基础重置 ========== */
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue",
+          "Microsoft YaHei", sans-serif;
+        color: #e8ecf4;
+        background: linear-gradient(
+          180deg,
+          #0b1a2f 0%,
+          #1a2f4a 60%,
+          #0b1a2f 100%
+        );
+        background-attachment: fixed;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+      }
+      /* 背景星点装饰 */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          radial-gradient(
+            circle at 20% 30%,
+            rgba(79, 172, 254, 0.18),
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 70%,
+            rgba(0, 242, 254, 0.14),
+            transparent 55%
+          );
+        z-index: 0;
+      }
+      button {
+        font-family: inherit;
+      }
+
+      /* 主容器：手机竖屏适配 */
+      #app {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+        min-height: 100dvh;
+        max-width: 480px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        /* safe-area 补偿 */
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      /* ========== 顶部标题栏 ========== */
+      .app-bar {
+        height: 56px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        padding: 0 calc(16px + env(safe-area-inset-right)) 0
+          calc(16px + env(safe-area-inset-left));
+        background: rgba(11, 26, 47, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .app-bar .title {
+        font-size: 17px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        letter-spacing: 1px;
+      }
+      .app-bar .bar-right {
+        position: absolute;
+        right: calc(16px + env(safe-area-inset-right));
+        top: 50%;
+        transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 15px;
+        cursor: pointer;
+        color: rgba(232, 236, 244, 0.75);
+      }
+
+      /* ========== 模式 Tab 栏 ========== */
+      .tab-bar {
+        flex-shrink: 0;
+        display: flex;
+        padding: 10px 16px 0;
+        gap: 8px;
+        position: relative;
+      }
+      .tab-btn {
+        flex: 1;
+        height: 42px;
+        border: none;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px 12px 0 0;
+        color: rgba(232, 236, 244, 0.6);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        position: relative;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .tab-btn .icon {
+        margin-right: 6px;
+        font-size: 15px;
+      }
+      .tab-btn.active {
+        background: rgba(255, 255, 255, 0.09);
+        color: #4facfe;
+      }
+      .tab-btn.active::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 20%;
+        right: 20%;
+        height: 3px;
+        border-radius: 3px 3px 0 0;
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        box-shadow: 0 0 8px rgba(79, 172, 254, 0.6);
+      }
+      .tab-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      .tab-btn:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+
+      /* ========== 内容区 ========== */
+      .main-content {
+        flex: 1;
+        padding: 12px 16px 54px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        min-height: 0;
+        position: relative;
+      }
+      .tab-panel {
+        display: none;
+        animation: fadeIn 0.25s ease;
+        position: relative;
+      }
+      .tab-panel.active {
+        display: block;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* 占位模块卡片 */
+      .panel-placeholder {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        border-radius: 16px;
+        padding: 40px 20px;
+        text-align: center;
+        color: rgba(232, 236, 244, 0.5);
+        font-size: 14px;
+      }
+      .panel-placeholder .ph-emoji {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 14px;
+        opacity: 0.8;
+      }
+      .panel-placeholder .ph-sub {
+        margin-top: 6px;
+        font-size: 12px;
+        color: rgba(232, 236, 244, 0.35);
+      }
+
+      /* ========== 底部免责声明 ========== */
+      .footer-disclaimer {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+        background: linear-gradient(
+          0deg,
+          rgba(11, 26, 47, 0.95),
+          rgba(11, 26, 47, 0.6) 80%,
+          transparent
+        );
+        text-align: center;
+        font-size: 11px;
+        color: rgba(232, 236, 244, 0.4);
+        line-height: 1.6;
+        z-index: 5;
+        pointer-events: none;
+      }
+      #app > .footer-disclaimer {
+        position: relative;
+        background: none;
+        padding: 8px 16px;
+        text-align: center;
+        margin-top: auto;
+        z-index: 0;
+        pointer-events: none;
+      }
+      /* 真正固定的版本（重叠防空白） */
+      .disclaimer-fixed {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 4;
+      }
+      .disclaimer-fixed .inner {
+        max-width: 480px;
+        margin: 0 auto;
+        padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+        background: linear-gradient(
+          0deg,
+          rgba(11, 26, 47, 0.98),
+          rgba(11, 26, 47, 0.7) 70%,
+          transparent
+        );
+        text-align: center;
+        font-size: 11px;
+        color: rgba(232, 236, 244, 0.4);
+        line-height: 1.6;
+      }
+
+      /* ========== 通用毛玻璃卡片 ========== */
+      .glass-card {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      /* ========== Toast ========== */
+      .toast-host {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: calc(20px + env(safe-area-inset-top));
+        z-index: 200;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+      .toast {
+        max-width: calc(100% - 64px);
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        transform: translateY(-20px);
+        opacity: 0;
+        transition:
+          opacity 0.25s,
+          transform 0.25s;
+        pointer-events: auto;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .toast.success {
+        background: rgba(74, 222, 128, 0.92);
+      }
+      .toast.error {
+        background: rgba(255, 93, 93, 0.92);
+      }
+      .toast.warn {
+        background: rgba(255, 171, 64, 0.95);
+        color: #3a2200;
+      }
+      .toast.info {
+        background: rgba(79, 172, 254, 0.95);
+      }
+
+      /* ========== 加载动画（旋转圆环） ========== */
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2.5px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #4facfe;
+        border-right-color: #4facfe;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .spinner.sm {
+        width: 16px;
+        height: 16px;
+        border-width: 2px;
+      }
+      .spinner.lg {
+        width: 44px;
+        height: 44px;
+        border-width: 3.5px;
+      }
+      .spinner.white {
+        border-color: rgba(255, 255, 255, 0.25);
+        border-top-color: #fff;
+        border-right-color: rgba(255, 255, 255, 0.55);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* 全屏加载遮罩 */
+      .loading-mask {
+        position: fixed;
+        inset: 0;
+        background: rgba(11, 26, 47, 0.65);
+        backdrop-filter: blur(3px);
+        z-index: 150;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .loading-mask.show {
+        display: flex;
+      }
+      .loading-mask .tip {
+        font-size: 13px;
+        color: rgba(232, 236, 244, 0.75);
+      }
+
+      /* ========== 状态占位页（覆盖主内容） ========== */
+      .status-overlay {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(11, 26, 47, 0.4);
+      }
+      .status-overlay.show {
+        display: flex;
+      }
+      .status-card {
+        background: rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 20px;
+        padding: 36px 24px 28px;
+        max-width: 320px;
+        width: 100%;
+        text-align: center;
+        animation: popIn 0.3s ease;
+      }
+      @keyframes popIn {
+        from {
+          opacity: 0;
+          transform: scale(0.92);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      .status-emoji {
+        font-size: 56px;
+        display: block;
+        margin-bottom: 16px;
+      }
+      .status-title {
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 8px;
+      }
+      .status-desc {
+        font-size: 13px;
+        color: rgba(232, 236, 244, 0.6);
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+      .status-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 40px;
+        padding: 0 22px;
+        border: none;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        color: #05223a;
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        box-shadow: 0 4px 14px rgba(79, 172, 254, 0.4);
+        transition:
+          transform 0.08s,
+          box-shadow 0.15s;
+      }
+      .status-btn:active {
+        transform: scale(0.96);
+        box-shadow: 0 2px 8px rgba(79, 172, 254, 0.3);
+      }
+      .status-btn.outline {
+        background: transparent;
+        border: 1.5px solid rgba(79, 172, 254, 0.45);
+        color: #4facfe;
+        box-shadow: none;
+      }
+
+      /* ========== 调试面板（演示状态切换） ========== */
+      .debug-toggle {
+        position: fixed;
+        right: 10px;
+        bottom: 46px;
+        z-index: 80;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(168, 85, 247, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(168, 85, 247, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-bottom: calc(env(safe-area-inset-bottom) / 2);
+        transition:
+          transform 0.15s,
+          opacity 0.15s;
+      }
+      .debug-toggle:active {
+        transform: scale(0.92);
+      }
+      .debug-panel {
+        position: fixed;
+        left: 50%;
+        bottom: 20px;
+        transform: translate(-50%, 20px);
+        width: calc(100% - 32px);
+        max-width: 440px;
+        padding: 12px 14px 14px;
+        background: rgba(20, 25, 40, 0.96);
+        border: 1px solid rgba(168, 85, 247, 0.4);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 90;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.2s,
+          transform 0.2s;
+        padding-bottom: calc(14px + env(safe-area-inset-bottom));
+      }
+      .debug-panel.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, 0);
+      }
+      .debug-panel h4 {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: #c9a5ff;
+        letter-spacing: 0.5px;
+      }
+      .debug-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 6px 0;
+        flex-wrap: wrap;
+      }
+      .debug-row .lbl {
+        font-size: 12px;
+        color: rgba(232, 236, 244, 0.65);
+        flex: 0 0 80px;
+      }
+      .debug-chip {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(232, 236, 244, 0.75);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .debug-chip.active {
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        border-color: transparent;
+        color: #05223a;
+      }
+      .debug-hint {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.1);
+        font-size: 11px;
+        color: rgba(232, 236, 244, 0.4);
+        line-height: 1.5;
+      }
+
+      /* ========== 弹幕投稿模块 ========== */
+      .danmu-title {
+        margin: 6px 0 14px;
+        text-align: center;
+        font-size: 17px;
+        font-weight: 700;
+        line-height: 1.5;
+        color: #fff;
+        text-shadow: 0 0 14px rgba(79, 172, 254, 0.5);
+      }
+      .danmu-title .glow {
+        background: linear-gradient(90deg, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      /* 输入卡片 */
+      .input-card {
+        padding: 12px 14px 8px;
+      }
+      .danmu-textarea {
+        width: 100%;
+        display: block;
+        min-height: 64px;
+        resize: none;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(11, 26, 47, 0.55);
+        color: #fff;
+        /* 16px 防 iOS 聚焦缩放 */
+        font-size: 16px;
+        line-height: 1.5;
+        padding: 10px 12px;
+        outline: none;
+        font-family: inherit;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .danmu-textarea:focus {
+        border-color: #4facfe;
+        box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.18);
+      }
+      .danmu-textarea::placeholder {
+        color: rgba(232, 236, 244, 0.35);
+      }
+      .input-foot {
+        display: flex;
+        justify-content: flex-end;
+        padding: 6px 2px 2px;
+      }
+      .char-count {
+        font-size: 11px;
+        color: rgba(232, 236, 244, 0.4);
+      }
+      .char-count.full {
+        color: #ffab40;
+      }
+
+      /* 点阵预览 */
+      .preview-stage {
+        margin: 12px 0;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 10px 12px 8px;
+        overflow: hidden;
+      }
+      .preview-label {
+        font-size: 12px;
+        color: rgba(232, 236, 244, 0.6);
+        margin-bottom: 6px;
+      }
+      #dotCanvas {
+        display: block;
+        width: 100%;
+        height: 104px;
+        border-radius: 10px;
+        background: radial-gradient(
+          ellipse at 50% 40%,
+          #10233f 0%,
+          #071224 70%
+        );
+      }
+      .preview-hint {
+        font-size: 10px;
+        color: rgba(232, 236, 244, 0.3);
+        text-align: center;
+        margin-top: 4px;
+      }
+
+      /* 提交按钮 */
+      .danmu-submit {
+        width: 100%;
+        height: 48px;
+        border: none;
+        border-radius: 24px;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: #05223a;
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        box-shadow: 0 6px 18px rgba(79, 172, 254, 0.4);
+        cursor: pointer;
+        transition:
+          transform 0.08s,
+          box-shadow 0.15s,
+          opacity 0.2s;
+      }
+      .danmu-submit:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      .danmu-submit:disabled {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(232, 236, 244, 0.4);
+        box-shadow: none;
+        cursor: not-allowed;
+        letter-spacing: 1px;
+      }
+
+      /* 排队提示 */
+      .queue-tip {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(79, 172, 254, 0.12);
+        border: 1px solid rgba(79, 172, 254, 0.3);
+        font-size: 13px;
+        color: #7fc8ff;
+        animation: queuePulse 1.2s ease-in-out infinite;
+      }
+      .queue-tip .q-no {
+        font-weight: 700;
+        color: #00f2fe;
+      }
+      @keyframes queuePulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 rgba(79, 172, 254, 0.25);
+        }
+        50% {
+          box-shadow: 0 0 16px rgba(79, 172, 254, 0.35);
+        }
+      }
+
+      /* 面板内关闭态遮罩（活动未开启） */
+      .panel-lock {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        border-radius: 16px;
+        background: rgba(11, 26, 47, 0.85);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+      .panel-lock.show {
+        display: flex;
+      }
+      .panel-lock-emoji {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+      .panel-lock-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .panel-lock-desc {
+        font-size: 12px;
+        color: rgba(232, 236, 244, 0.55);
+        line-height: 1.6;
+      }
+
+      /* ========== AI 画图模块 ========== */
+      .paint-canvas-wrap {
+        position: relative;
+        width: 80%;
+        max-width: 300px;
+        margin: 0 auto;
+        aspect-ratio: 1 / 1;
+      }
+      #paintCanvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: #f5f7fa;
+        border-radius: 14px;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        touch-action: none;
+        cursor: crosshair;
+      }
+      #paintCanvas.locked {
+        cursor: not-allowed;
+        opacity: 0.85;
+      }
+      .paint-locked-badge {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 12px;
+        background: rgba(11, 26, 47, 0.55);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        border-radius: 14px;
+        color: #7ef29f;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.6;
+      }
+      .paint-locked-badge.show {
+        display: flex;
+      }
+
+      /* 工具栏 */
+      .tool-bar {
+        display: flex;
+        gap: 8px;
+        margin: 14px 0 10px;
+      }
+      .tool-btn {
+        flex: 1;
+        height: 38px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(232, 236, 244, 0.85);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition:
+          transform 0.08s,
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .tool-btn:active {
+        transform: scale(0.95);
+      }
+      .tool-btn.active {
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        border-color: transparent;
+        color: #05223a;
+      }
+
+      /* 调色盘 */
+      .palette {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        margin: 4px 0 16px;
+      }
+      .color-swatch {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        cursor: pointer;
+        transition:
+          transform 0.1s,
+          box-shadow 0.15s;
+      }
+      .color-swatch:active {
+        transform: scale(0.9);
+      }
+      .color-swatch.active {
+        border-color: #fff;
+        box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.55);
+      }
+
+      /* 操作按钮 */
+      .paint-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .paint-btn {
+        width: 100%;
+        height: 46px;
+        border-radius: 23px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        cursor: pointer;
+        transition:
+          transform 0.08s,
+          opacity 0.2s,
+          box-shadow 0.15s;
+      }
+      .paint-btn:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      .paint-btn.primary {
+        border: none;
+        color: #05223a;
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        box-shadow: 0 6px 18px rgba(79, 172, 254, 0.4);
+      }
+      .paint-btn.primary:disabled {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(232, 236, 244, 0.4);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      .paint-btn.outline {
+        background: transparent;
+        border: 1.5px solid rgba(79, 172, 254, 0.5);
+        color: #4facfe;
+      }
+
+      /* ========== 通用模态框 ========== */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 180;
+        background: rgba(5, 10, 20, 0.72);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .modal-overlay.show {
+        display: flex;
+      }
+      .modal-box {
+        width: 100%;
+        max-width: 320px;
+        background: rgba(20, 32, 54, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 22px 20px 18px;
+        text-align: center;
+        animation: popIn 0.25s ease;
+      }
+      .modal-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 8px;
+      }
+      .modal-desc {
+        font-size: 13px;
+        color: rgba(232, 236, 244, 0.6);
+        line-height: 1.6;
+        margin-bottom: 18px;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+      }
+      .modal-btn {
+        flex: 1;
+        height: 40px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+      }
+      .modal-btn:active {
+        transform: scale(0.97);
+      }
+      .modal-btn.cancel {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(232, 236, 244, 0.85);
+      }
+      .modal-btn.ok {
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        color: #05223a;
+      }
+      #previewCanvas {
+        width: 100%;
+        display: block;
+        border-radius: 12px;
+        background: #fff;
+        margin: 4px 0 2px;
+      }
+      .preview-sub {
+        font-size: 12px;
+        color: rgba(232, 236, 244, 0.45);
+        margin: 0 0 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 顶部标题栏 -->
+      <header class="app-bar">
+        <div class="title">✨ 蜂群星空互动</div>
+        <div class="bar-right" id="infoBtn" title="关于">ⓘ</div>
+      </header>
+
+      <!-- 模式 Tab 栏 -->
+      <nav class="tab-bar" id="tabBar">
+        <button class="tab-btn active" data-tab="danmu">
+          <span class="icon">💬</span>弹幕投稿
+        </button>
+        <button class="tab-btn" data-tab="paint">
+          <span class="icon">🎨</span>AI 画图
+        </button>
+      </nav>
+
+      <!-- 主内容区 -->
+      <main class="main-content">
+        <!-- 弹幕投稿模块 -->
+        <section class="tab-panel active" data-panel="danmu">
+          <!-- 活动未开启时覆盖面板的遮罩 -->
+          <div class="panel-lock" id="danmuLock">
+            <div class="panel-lock-emoji">⏳</div>
+            <div class="panel-lock-title">弹幕互动暂未开启</div>
+            <div class="panel-lock-desc">
+              请耐心等待，工作人员启动后即可投稿
+            </div>
+          </div>
+
+          <div id="danmuWrap">
+            <h2 class="danmu-title">
+              💬 发送你的空中弹幕<br /><span class="glow">点亮现场夜空</span>
+            </h2>
+
+            <!-- 文字输入 -->
+            <div class="glass-card input-card">
+              <textarea
+                id="danmuInput"
+                class="danmu-textarea"
+                rows="2"
+                maxlength="18"
+                placeholder="输入你想说的话（最多18字）"
+              ></textarea>
+              <div class="input-foot">
+                <span class="char-count" id="charCount">已输入 0/18 字</span>
+              </div>
+            </div>
+
+            <!-- 点阵预览 -->
+            <div class="preview-stage">
+              <div class="preview-label">🛰️ 空中点阵预览</div>
+              <canvas id="dotCanvas"></canvas>
+              <div class="preview-hint">
+                输入文字后实时模拟无人机 LED 点阵效果
+              </div>
+            </div>
+
+            <!-- 提交按钮 -->
+            <button class="danmu-submit" id="danmuSubmit" disabled>
+              发送弹幕
+            </button>
+
+            <!-- 排队提示（提交成功后显示） -->
+            <div class="queue-tip" id="queueTip" style="display: none">
+              <span class="spinner sm white"></span>
+              <span
+                >弹幕已入队，正在排队升空，前方约
+                <span class="q-no" id="queueNo">0</span> 架等待</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <!-- AI 画图模块（多人分块共创） -->
+        <section class="tab-panel" data-panel="paint">
+          <!-- 活动未开启时覆盖面板的遮罩 -->
+          <div class="panel-lock" id="paintLock">
+            <div class="panel-lock-emoji">🎨</div>
+            <div class="panel-lock-title">图案共创活动暂未开启</div>
+            <div class="panel-lock-desc">
+              请耐心等待，活动开启后即可绘制你的共创分片
+            </div>
+          </div>
+
+          <div id="paintWrap">
+            <h2 class="danmu-title" id="paintTitle">
+              🎨 你正在绘制 -/12 共创分片
+            </h2>
+
+            <!-- 专属分片画布（1:1） -->
+            <div class="paint-canvas-wrap">
+              <canvas id="paintCanvas"></canvas>
+              <div class="paint-locked-badge" id="paintBadge">
+                ✅ 已提交，等待合成升空
+              </div>
+            </div>
+
+            <!-- 工具栏 -->
+            <div class="tool-bar">
+              <button class="tool-btn active" data-tool="pen">🖌️ 画笔</button>
+              <button class="tool-btn" data-tool="eraser">🧽 橡皮</button>
+              <button class="tool-btn" id="paintClear">🗑️ 清空</button>
+            </div>
+
+            <!-- 调色盘（默认黑色） -->
+            <div class="palette" id="paintPalette">
+              <span
+                class="color-swatch"
+                data-color="#ff4d4f"
+                style="background: #ff4d4f"
+                title="红"
+              ></span>
+              <span
+                class="color-swatch"
+                data-color="#ff9f1c"
+                style="background: #ff9f1c"
+                title="橙"
+              ></span>
+              <span
+                class="color-swatch"
+                data-color="#ffd60a"
+                style="background: #ffd60a"
+                title="黄"
+              ></span>
+              <span
+                class="color-swatch"
+                data-color="#34c759"
+                style="background: #34c759"
+                title="绿"
+              ></span>
+              <span
+                class="color-swatch"
+                data-color="#4facfe"
+                style="background: #4facfe"
+                title="蓝"
+              ></span>
+              <span
+                class="color-swatch"
+                data-color="#a855f7"
+                style="background: #a855f7"
+                title="紫"
+              ></span>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="paint-actions">
+              <button class="paint-btn outline" id="paintPreview">
+                🌐 全局拼接预览
+              </button>
+              <button class="paint-btn primary" id="paintSubmit" disabled>
+                作品提交
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 状态占位层：活动未开启 / 已结束 / 网络异常 -->
+        <div class="status-overlay" id="statusOverlay">
+          <div class="status-card" id="statusCard">
+            <!-- JS 动态注入 -->
+          </div>
+        </div>
+      </main>
+
+      <!-- 底部免责声明（跟随内容 + 固定两层防空白） -->
+      <div class="footer-disclaimer">
+        提交内容需合规，违规内容将被拦截，不予空中展示
+      </div>
+    </div>
+    <div class="disclaimer-fixed">
+      <div class="inner">提交内容需合规，违规内容将被拦截，不予空中展示</div>
+    </div>
+
+    <!-- Toast 容器 -->
+    <div class="toast-host" id="toastHost"></div>
+
+    <!-- 全屏加载遮罩 -->
+    <div class="loading-mask" id="loadingMask">
+      <div class="spinner lg white"></div>
+      <div class="tip" id="loadingTip">加载中…</div>
+    </div>
+
+    <!-- 通用确认模态框 -->
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal-box">
+        <div class="modal-title" id="modalTitle">提示</div>
+        <div class="modal-desc" id="modalDesc"></div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" id="modalCancel">取消</button>
+          <button class="modal-btn ok" id="modalOk">确定</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全局拼接预览模态框 -->
+    <div class="modal-overlay" id="previewOverlay">
+      <div class="modal-box">
+        <div class="modal-title">🌐 全局拼接预览</div>
+        <canvas id="previewCanvas" width="300" height="225"></canvas>
+        <p class="preview-sub">
+          12 个共创分片合成效果（模拟），蓝色框为你的分片
+        </p>
+        <div class="modal-actions">
+          <button class="modal-btn ok" id="previewClose">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 调试切换按钮 -->
+    <button class="debug-toggle" id="debugToggle" title="打开/关闭调试面板">
+      ⚙
+    </button>
+
+    <!-- 调试面板 -->
+    <div class="debug-panel" id="debugPanel">
+      <h4>🔧 演示状态切换（观众端 H5）</h4>
+
+      <div class="debug-row">
+        <span class="lbl">活动状态</span>
+        <button class="debug-chip" data-status="activity" data-val="closed">
+          未开启
+        </button>
+        <button
+          class="debug-chip active"
+          data-status="activity"
+          data-val="open"
+        >
+          进行中
+        </button>
+        <button class="debug-chip" data-status="activity" data-val="ended">
+          已结束
+        </button>
+      </div>
+
+      <div class="debug-row">
+        <span class="lbl">网络状态</span>
+        <button
+          class="debug-chip active"
+          data-status="network"
+          data-val="online"
+        >
+          在线
+        </button>
+        <button class="debug-chip" data-status="network" data-val="offline">
+          离线
+        </button>
+      </div>
+
+      <div class="debug-row">
+        <span class="lbl">Toast 演示</span>
+        <button class="debug-chip" data-demo="toast-success">成功</button>
+        <button class="debug-chip" data-demo="toast-warn">警告</button>
+        <button class="debug-chip" data-demo="toast-error">失败</button>
+        <button class="debug-chip" data-demo="toast-info">信息</button>
+      </div>
+
+      <div class="debug-row">
+        <span class="lbl">加载演示</span>
+        <button class="debug-chip" data-demo="loading">显示 1.5s</button>
+      </div>
+
+      <div class="debug-row">
+        <span class="lbl">共创调试</span>
+        <button class="debug-chip" data-demo="paint-reset">
+          主办方重置画布
+        </button>
+        <button class="debug-chip" data-demo="paint-reroll">
+          重新分配分片
+        </button>
+      </div>
+
+      <div class="debug-hint">
+        控制台也可直接赋值：<br />
+        <code>window.STATE.activityStatus = 'closed'; renderStatus();</code>
+      </div>
+    </div>
+
+    <script>
+      /* ========== 全局状态（模拟） ========== */
+      window.STATE = {
+        activityStatus: "open", // 'open' | 'closed' | 'ended'
+        networkStatus: "online", // 'online' | 'offline'
+        currentTab: "danmu", // 'danmu' | 'paint'
+      };
+
+      /* ========== Toast API ========== */
+      function showToast(msg, type, duration) {
+        type = type || "info";
+        duration = duration || 2400;
+        var host = document.getElementById("toastHost");
+        var el = document.createElement("div");
+        el.className = "toast " + type;
+        el.textContent = msg;
+        host.appendChild(el);
+        // 触发动画
+        requestAnimationFrame(function () {
+          el.classList.add("show");
+        });
+        setTimeout(function () {
+          el.classList.remove("show");
+          setTimeout(function () {
+            el.remove();
+          }, 300);
+        }, duration);
+      }
+
+      /* ========== 全屏加载 API ========== */
+      var loadingTimer = null;
+      function showLoading(tip) {
+        var mask = document.getElementById("loadingMask");
+        if (tip) document.getElementById("loadingTip").textContent = tip;
+        else document.getElementById("loadingTip").textContent = "加载中…";
+        mask.classList.add("show");
+      }
+      function hideLoading() {
+        document.getElementById("loadingMask").classList.remove("show");
+        if (loadingTimer) {
+          clearTimeout(loadingTimer);
+          loadingTimer = null;
+        }
+      }
+      function demoLoading(ms) {
+        showLoading();
+        if (loadingTimer) clearTimeout(loadingTimer);
+        loadingTimer = setTimeout(hideLoading, ms || 1500);
+      }
+
+      /* ========== 状态渲染（活动状态 + 网络状态） ========== */
+      function renderStatus() {
+        var overlay = document.getElementById("statusOverlay");
+        var card = document.getElementById("statusCard");
+        var tabBtns = document.querySelectorAll(".tab-btn");
+
+        // 网络异常优先级最高
+        if (window.STATE.networkStatus === "offline") {
+          card.innerHTML =
+            '<span class="status-emoji">📡</span>' +
+            '<div class="status-title">网络连接异常</div>' +
+            '<div class="status-desc">无法连接到表演互动服务，请检查手机网络后重试。</div>' +
+            '<button class="status-btn" id="statusRetryBtn">' +
+            '  <span style="display:inline-block;">🔄</span> 刷新重试' +
+            "</button>";
+          overlay.classList.add("show");
+          // Tab 同时禁用（无网络无法交互）
+          tabBtns.forEach(function (b) {
+            b.disabled = true;
+          });
+          // 重试按钮
+          var btn = document.getElementById("statusRetryBtn");
+          btn.onclick = function () {
+            showLoading("连接中…");
+            setTimeout(function () {
+              window.STATE.networkStatus = "online";
+              hideLoading();
+              renderStatus();
+              showToast("网络已恢复", "success");
+            }, 1200);
+          };
+          renderDebugChips();
+          return;
+        }
+
+        // 活动未开启
+        if (window.STATE.activityStatus === "closed") {
+          card.innerHTML =
+            '<span class="status-emoji">⏳</span>' +
+            '<div class="status-title">互动尚未开启</div>' +
+            '<div class="status-desc">现场互动活动尚未开启，请等待工作人员启动后再参与，感谢耐心等待。</div>';
+          overlay.classList.add("show");
+          tabBtns.forEach(function (b) {
+            b.disabled = true;
+          });
+          // 两个面板内同步显示关闭遮罩（防止强行切到该 Tab）
+          ["danmuLock", "paintLock"].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add("show");
+          });
+          renderDebugChips();
+          return;
+        }
+
+        // 活动已结束
+        if (window.STATE.activityStatus === "ended") {
+          card.innerHTML =
+            '<span class="status-emoji">🎆</span>' +
+            '<div class="status-title">互动已结束</div>' +
+            '<div class="status-desc">本次无人机互动表演已结束，感谢您的参与，期待下次再会！</div>';
+          overlay.classList.add("show");
+          tabBtns.forEach(function (b) {
+            b.disabled = true;
+          });
+          renderDebugChips();
+          return;
+        }
+
+        // 正常：open + online
+        overlay.classList.remove("show");
+        tabBtns.forEach(function (b) {
+          b.disabled = false;
+        });
+        ["danmuLock", "paintLock"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.classList.remove("show");
+        });
+        renderDebugChips();
+      }
+
+      /* ========== Tab 切换 ========== */
+      function switchTab(tabKey) {
+        if (
+          window.STATE.networkStatus !== "online" ||
+          window.STATE.activityStatus !== "open"
+        )
+          return;
+        window.STATE.currentTab = tabKey;
+        // 按钮
+        document.querySelectorAll(".tab-btn").forEach(function (b) {
+          b.classList.toggle("active", b.getAttribute("data-tab") === tabKey);
+        });
+        // 面板
+        document.querySelectorAll(".tab-panel").forEach(function (p) {
+          p.classList.toggle("active", p.getAttribute("data-panel") === tabKey);
+        });
+        // 切回弹幕 Tab 时重绘点阵预览（隐藏面板尺寸为 0 会导致画布空）
+        if (tabKey === "danmu" && typeof renderDanmuPreview === "function") {
+          requestAnimationFrame(renderDanmuPreview);
+        }
+        // 切到画图 Tab 时重设画布尺寸
+        if (tabKey === "paint" && typeof sizePaintCanvas === "function") {
+          requestAnimationFrame(sizePaintCanvas);
+        }
+      }
+
+      /* ========== 调试面板 ========== */
+      function toggleDebugPanel() {
+        var p = document.getElementById("debugPanel");
+        p.classList.toggle("show");
+      }
+
+      function renderDebugChips() {
+        // activity
+        document
+          .querySelectorAll('.debug-chip[data-status="activity"]')
+          .forEach(function (c) {
+            c.classList.toggle(
+              "active",
+              c.getAttribute("data-val") === window.STATE.activityStatus,
+            );
+          });
+        // network
+        document
+          .querySelectorAll('.debug-chip[data-status="network"]')
+          .forEach(function (c) {
+            c.classList.toggle(
+              "active",
+              c.getAttribute("data-val") === window.STATE.networkStatus,
+            );
+          });
+      }
+
+      /* ========== 弹幕投稿模块（唯一实现点） ========== */
+      var danmuInput,
+        charCountEl,
+        danmuSubmit,
+        dotCanvas,
+        dotCtx,
+        queueTipEl,
+        queueNoEl;
+      var DANMU_MAX = 18; // 字数上限
+      var BAD_WORDS = ["暴力", "色情", "赌博", "毒品", "诈骗", "反动"];
+      var COOLDOWN_SEC = 10; // 提交后冷却秒数
+      var OVERLOAD_LIMIT = 5; // 60s 内提交次数阈值
+      var OVERLOAD_WINDOW = 60000;
+      var mySubmissions = []; // 本设备已提交内容（模拟）
+      var submitTimestamps = []; // 提交时间戳（过载判定）
+      var cooldownLeft = 0;
+      var cooldownTimer = null;
+      var queueHideTimer = null;
+
+      function renderDanmuPreview() {
+        if (!dotCanvas || !dotCtx) return;
+        var dpr = window.devicePixelRatio || 1;
+        var rect = dotCanvas.getBoundingClientRect();
+        var w = Math.round(rect.width);
+        var h = Math.round(rect.height);
+        if (w === 0 || h === 0) return; // 面板隐藏中
+        if (dotCanvas.width !== w * dpr) {
+          dotCanvas.width = w * dpr;
+          dotCanvas.height = h * dpr;
+        }
+        dotCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        dotCtx.clearRect(0, 0, w, h);
+
+        // 1) 背景点阵网格（未点亮的灯位）
+        dotCtx.fillStyle = "rgba(79,172,254,0.10)";
+        var gap = 7;
+        for (var gx = gap / 2; gx < w; gx += gap) {
+          for (var gy = gap / 2; gy < h; gy += gap) {
+            dotCtx.beginPath();
+            dotCtx.arc(gx, gy, 1, 0, Math.PI * 2);
+            dotCtx.fill();
+          }
+        }
+
+        // 2) 文字 → 离屏渲染 → 按 alpha 采样 → 画发光点阵
+        var text = (danmuInput ? danmuInput.value : "").trim();
+        if (!text) return;
+        var off = document.createElement("canvas");
+        off.width = w;
+        off.height = h;
+        var octx = off.getContext("2d");
+        // 自适应字号：从大到小收缩到画布宽度内
+        var fs = 46;
+        octx.textAlign = "center";
+        octx.textBaseline = "middle";
+        do {
+          octx.font =
+            "700 " + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+          if (octx.measureText(text).width <= w - 14 || fs <= 14) break;
+          fs -= 2;
+        } while (true);
+        octx.fillStyle = "#fff";
+        octx.fillText(text, w / 2, h / 2);
+
+        var img = octx.getImageData(0, 0, w, h).data;
+        var step = 4;
+        dotCtx.save();
+        dotCtx.shadowColor = "#4facfe";
+        dotCtx.shadowBlur = 6;
+        dotCtx.fillStyle = "#8fd6ff";
+        for (var yy = step / 2; yy < h; yy += step) {
+          for (var xx = step / 2; xx < w; xx += step) {
+            var alpha = img[(Math.floor(yy) * w + Math.floor(xx)) * 4 + 3];
+            if (alpha > 128) {
+              dotCtx.beginPath();
+              dotCtx.arc(xx, yy, 1.7, 0, Math.PI * 2);
+              dotCtx.fill();
+            }
+          }
+        }
+        dotCtx.restore();
+      }
+
+      function updateSubmitState() {
+        if (!danmuSubmit) return;
+        var hasText = !!(danmuInput && danmuInput.value.trim());
+        danmuSubmit.disabled = !hasText || cooldownLeft > 0;
+        if (cooldownLeft > 0) {
+          danmuSubmit.textContent = "请等待 " + cooldownLeft + " 秒";
+        } else {
+          danmuSubmit.textContent = "发送弹幕";
+        }
+      }
+
+      function startCooldown() {
+        cooldownLeft = COOLDOWN_SEC;
+        updateSubmitState();
+        if (cooldownTimer) clearInterval(cooldownTimer);
+        cooldownTimer = setInterval(function () {
+          cooldownLeft--;
+          if (cooldownLeft <= 0) {
+            clearInterval(cooldownTimer);
+            cooldownTimer = null;
+          }
+          updateSubmitState();
+        }, 1000);
+      }
+
+      function showQueue(queueNo) {
+        if (!queueTipEl) return;
+        queueNoEl.textContent = queueNo;
+        queueTipEl.style.display = "flex";
+        if (queueHideTimer) clearTimeout(queueHideTimer);
+        queueHideTimer = setTimeout(function () {
+          queueTipEl.style.display = "none";
+        }, 5000);
+      }
+
+      function submitDanmu() {
+        var text = danmuInput.value.trim();
+        if (!text || cooldownLeft > 0) return;
+
+        // 敏感词校验
+        var hit = BAD_WORDS.some(function (w) {
+          return text.indexOf(w) >= 0;
+        });
+        if (hit) {
+          showToast("❌ 内容包含违规信息，投稿已拦截", "error");
+          danmuInput.value = "";
+          charCountEl.textContent = "已输入 0/" + DANMU_MAX + " 字";
+          charCountEl.classList.remove("full");
+          renderDanmuPreview();
+          updateSubmitState();
+          return;
+        }
+
+        // 过载判定：60s 内提交过多
+        var now = Date.now();
+        submitTimestamps = submitTimestamps.filter(function (t) {
+          return now - t < OVERLOAD_WINDOW;
+        });
+        if (submitTimestamps.length >= OVERLOAD_LIMIT) {
+          showToast("⚠️ 当前参与人数过多，请稍后再试", "warn");
+          return;
+        }
+
+        // 提交成功（纯前端模拟）
+        submitTimestamps.push(now);
+        mySubmissions.push({ text: text, time: now });
+        var queueNo =
+          1200 + Math.floor(Math.random() * 300) + mySubmissions.length;
+        showQueue(queueNo);
+        showToast("✅ 弹幕投稿成功，正在排队升空展示", "success");
+
+        // 清空输入
+        danmuInput.value = "";
+        charCountEl.textContent = "已输入 0/" + DANMU_MAX + " 字";
+        charCountEl.classList.remove("full");
+        renderDanmuPreview();
+        startCooldown();
+      }
+
+      function initDanmu() {
+        danmuInput = document.getElementById("danmuInput");
+        charCountEl = document.getElementById("charCount");
+        danmuSubmit = document.getElementById("danmuSubmit");
+        dotCanvas = document.getElementById("dotCanvas");
+        queueTipEl = document.getElementById("queueTip");
+        queueNoEl = document.getElementById("queueNo");
+        if (!danmuInput) return;
+        dotCtx = dotCanvas.getContext("2d");
+
+        // 输入：字数限制 + 实时统计 + 实时点阵预览
+        danmuInput.addEventListener("input", function () {
+          var v = danmuInput.value;
+          if (v.length > DANMU_MAX) v = v.slice(0, DANMU_MAX);
+          danmuInput.value = v;
+          charCountEl.textContent =
+            "已输入 " + v.length + "/" + DANMU_MAX + " 字";
+          charCountEl.classList.toggle("full", v.length >= DANMU_MAX);
+          renderDanmuPreview();
+          updateSubmitState();
+        });
+
+        danmuSubmit.addEventListener("click", submitDanmu);
+
+        // 窗口尺寸变化时重绘点阵
+        window.addEventListener("resize", renderDanmuPreview);
+
+        // 首次绘制空背景网格
+        renderDanmuPreview();
+        updateSubmitState();
+      }
+
+      /* ========== 通用确认模态框 ========== */
+      var modalOkCb = null;
+      function showAudModal(title, desc, onOk, okText) {
+        document.getElementById("modalTitle").textContent = title;
+        document.getElementById("modalDesc").textContent = desc;
+        document.getElementById("modalOk").textContent = okText || "确定";
+        modalOkCb = onOk || null;
+        document.getElementById("modalOverlay").classList.add("show");
+      }
+      function hideAudModal() {
+        document.getElementById("modalOverlay").classList.remove("show");
+        modalOkCb = null;
+      }
+
+      /* ========== AI 画图模块（多人分块共创，唯一实现点） ========== */
+      var paintCanvas, paintCtx;
+      var ptTool = "pen"; // 'pen' | 'eraser'
+      var ptColor = "#222222"; // 默认黑色
+      var ptDrawing = false;
+      var ptHasInk = false;
+      var ptSubmitted = false;
+      var ptFragNo = 0;
+      var PT_TOTAL = 12; // 总分片数
+      var PT_COLORS = [
+        "#ff4d4f",
+        "#ff9f1c",
+        "#ffd60a",
+        "#34c759",
+        "#4facfe",
+        "#a855f7",
+      ];
+      var coPieces = []; // 模拟已提交分片数据
+
+      function rollPaintFragment() {
+        ptFragNo = 1 + Math.floor(Math.random() * PT_TOTAL);
+        var titleEl = document.getElementById("paintTitle");
+        if (titleEl) {
+          titleEl.innerHTML =
+            "🎨 你正在绘制 <span class='glow'>" +
+            ptFragNo +
+            "/" +
+            PT_TOTAL +
+            "</span> 共创分片";
+        }
+      }
+
+      function sizePaintCanvas() {
+        if (!paintCanvas || !paintCtx) return;
+        var rect = paintCanvas.getBoundingClientRect();
+        if (rect.width === 0) return; // 面板隐藏中
+        var dpr = window.devicePixelRatio || 1;
+        var w = Math.round(rect.width);
+        if (paintCanvas.width !== w * dpr) {
+          // 缩放前保留已有画作
+          var backup = paintCanvas.width ? paintCanvas.toDataURL() : null;
+          paintCanvas.width = w * dpr;
+          paintCanvas.height = w * dpr;
+          paintCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          if (backup) {
+            var img = new Image();
+            img.onload = function () {
+              paintCtx.drawImage(img, 0, 0, w, w);
+            };
+            img.src = backup;
+          }
+        } else {
+          paintCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+      }
+
+      function paintPos(e) {
+        var r = paintCanvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+
+      function clearPaintCanvas() {
+        paintCtx.save();
+        paintCtx.setTransform(1, 0, 0, 1, 0, 0);
+        paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
+        paintCtx.restore();
+      }
+
+      function updatePaintSubmit() {
+        var btn = document.getElementById("paintSubmit");
+        if (!btn) return;
+        btn.disabled = !ptHasInk || ptSubmitted;
+        btn.textContent = ptSubmitted ? "✅ 已提交 · 等待合成升空" : "作品提交";
+      }
+
+      function paintStart(e) {
+        if (ptSubmitted) return;
+        e.preventDefault();
+        try {
+          paintCanvas.setPointerCapture(e.pointerId);
+        } catch (err) {}
+        ptDrawing = true;
+        var p = paintPos(e);
+        paintCtx.lineCap = "round";
+        paintCtx.lineJoin = "round";
+        if (ptTool === "eraser") {
+          paintCtx.globalCompositeOperation = "destination-out";
+          paintCtx.lineWidth = 22;
+        } else {
+          paintCtx.globalCompositeOperation = "source-over";
+          paintCtx.strokeStyle = ptColor;
+          paintCtx.lineWidth = 4;
+        }
+        paintCtx.beginPath();
+        paintCtx.moveTo(p.x, p.y);
+        paintCtx.lineTo(p.x + 0.01, p.y + 0.01);
+        paintCtx.stroke();
+        ptHasInk = true;
+        updatePaintSubmit();
+      }
+      function paintMove(e) {
+        if (!ptDrawing || ptSubmitted) return;
+        e.preventDefault();
+        var p = paintPos(e);
+        paintCtx.lineTo(p.x, p.y);
+        paintCtx.stroke();
+      }
+      function paintEnd() {
+        ptDrawing = false;
+        paintCtx.globalCompositeOperation = "source-over";
+        // 抬笔后按真实像素重新判定是否为空（处理"全部擦除"场景）
+        if (!ptSubmitted) {
+          ptHasInk = !paintCanvasIsEmpty();
+          updatePaintSubmit();
+        }
+      }
+
+      /* 采样画布是否为空（alpha 通道稀疏采样，兼顾性能） */
+      function paintCanvasIsEmpty() {
+        try {
+          var data = paintCtx.getImageData(
+            0,
+            0,
+            paintCanvas.width,
+            paintCanvas.height,
+          ).data;
+          for (var i = 3; i < data.length; i += 400) {
+            if (data[i] > 10) return false;
+          }
+          return true;
+        } catch (e) {
+          return !ptHasInk;
+        }
+      }
+
+      /* 全局拼接预览：12 分片（4列×3行）模拟合成图 */
+      function drawPreviewCanvas() {
+        var c = document.getElementById("previewCanvas");
+        if (!c) return;
+        var ctx = c.getContext("2d");
+        var W = c.width,
+          H = c.height;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, W, H);
+        var cols = 4,
+          rows = 3;
+        var cw = W / cols,
+          ch = H / rows,
+          pad = 5;
+        var tints = [
+          "#fff3f3",
+          "#fff7ec",
+          "#fefce8",
+          "#ecfdf3",
+          "#eef7ff",
+          "#f6f0ff",
+        ];
+        for (var i = 0; i < PT_TOTAL; i++) {
+          var cx = (i % cols) * cw;
+          var cy = Math.floor(i / cols) * ch;
+          var x0 = cx + pad / 2,
+            y0 = cy + pad / 2;
+          var cw2 = cw - pad,
+            ch2 = ch - pad;
+          // 分片底色
+          ctx.fillStyle = tints[i % tints.length];
+          ctx.fillRect(x0, y0, cw2, ch2);
+          // 分片虚线边框
+          ctx.strokeStyle = "rgba(0,0,0,0.18)";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(x0, y0, cw2, ch2);
+          ctx.setLineDash([]);
+          // 模拟其他用户的图形
+          var mx = cx + cw / 2,
+            my = cy + ch / 2;
+          var R = Math.min(cw, ch) * 0.22;
+          ctx.fillStyle = PT_COLORS[i % PT_COLORS.length];
+          ctx.strokeStyle = PT_COLORS[i % PT_COLORS.length];
+          var kind = i % 5;
+          if (kind === 0) {
+            ctx.beginPath();
+            ctx.arc(mx, my, R, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (kind === 1) {
+            ctx.beginPath();
+            ctx.moveTo(mx, my - R);
+            ctx.lineTo(mx + R, my + R * 0.8);
+            ctx.lineTo(mx - R, my + R * 0.8);
+            ctx.closePath();
+            ctx.fill();
+          } else if (kind === 2) {
+            ctx.fillRect(mx - R, my - R, R * 2, R * 2);
+          } else if (kind === 3) {
+            // 五角星
+            ctx.beginPath();
+            for (var k = 0; k < 5; k++) {
+              var a1 = -Math.PI / 2 + (k * 2 * Math.PI) / 5;
+              var a2 = a1 + Math.PI / 5;
+              ctx.lineTo(mx + Math.cos(a1) * R, my + Math.sin(a1) * R);
+              ctx.lineTo(
+                mx + Math.cos(a2) * R * 0.45,
+                my + Math.sin(a2) * R * 0.45,
+              );
+            }
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            // 爱心
+            ctx.beginPath();
+            ctx.moveTo(mx, my + R * 0.9);
+            ctx.bezierCurveTo(
+              mx - R * 1.4,
+              my - R * 0.3,
+              mx - R * 0.5,
+              my - R * 1.1,
+              mx,
+              my - R * 0.3,
+            );
+            ctx.bezierCurveTo(
+              mx + R * 0.5,
+              my - R * 1.1,
+              mx + R * 1.4,
+              my - R * 0.3,
+              mx,
+              my + R * 0.9,
+            );
+            ctx.fill();
+          }
+          // 当前用户分片高亮蓝框
+          if (i + 1 === ptFragNo) {
+            ctx.strokeStyle = "#4facfe";
+            ctx.lineWidth = 3;
+            ctx.setLineDash([]);
+            ctx.strokeRect(x0 + 1.5, y0 + 1.5, cw2 - 3, ch2 - 3);
+          }
+        }
+      }
+
+      function initPaint() {
+        paintCanvas = document.getElementById("paintCanvas");
+        if (!paintCanvas) return;
+        paintCtx = paintCanvas.getContext("2d");
+        rollPaintFragment();
+
+        // 绘制事件（Pointer 统一鼠标/触摸/手写笔）
+        paintCanvas.addEventListener("pointerdown", paintStart);
+        paintCanvas.addEventListener("pointermove", paintMove);
+        paintCanvas.addEventListener("pointerup", paintEnd);
+        paintCanvas.addEventListener("pointercancel", paintEnd);
+
+        // 工具切换（画笔/橡皮）
+        document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (ptSubmitted) return;
+            ptTool = b.getAttribute("data-tool");
+            document
+              .querySelectorAll(".tool-btn[data-tool]")
+              .forEach(function (x) {
+                x.classList.toggle("active", x === b);
+              });
+          });
+        });
+
+        // 调色盘
+        document.querySelectorAll(".color-swatch").forEach(function (s) {
+          s.addEventListener("click", function () {
+            if (ptSubmitted) return;
+            ptColor = s.getAttribute("data-color");
+            ptTool = "pen";
+            document
+              .querySelectorAll(".tool-btn[data-tool]")
+              .forEach(function (x) {
+                x.classList.toggle(
+                  "active",
+                  x.getAttribute("data-tool") === "pen",
+                );
+              });
+            document.querySelectorAll(".color-swatch").forEach(function (x) {
+              x.classList.toggle("active", x === s);
+            });
+          });
+        });
+
+        // 清空（二次确认）
+        document
+          .getElementById("paintClear")
+          .addEventListener("click", function () {
+            if (ptSubmitted) {
+              showToast("作品已提交，无法修改", "warn");
+              return;
+            }
+            if (!ptHasInk) {
+              showToast("画布还是空的", "info");
+              return;
+            }
+            showAudModal(
+              "清空画布",
+              "将清除当前分片的全部绘制内容，确认？",
+              function () {
+                clearPaintCanvas();
+                ptHasInk = false;
+                updatePaintSubmit();
+                showToast("画布已清空", "info");
+              },
+              "清空",
+            );
+          });
+
+        // 全局拼接预览
+        document
+          .getElementById("paintPreview")
+          .addEventListener("click", function () {
+            drawPreviewCanvas();
+            document.getElementById("previewOverlay").classList.add("show");
+          });
+        document
+          .getElementById("previewClose")
+          .addEventListener("click", function () {
+            document.getElementById("previewOverlay").classList.remove("show");
+          });
+
+        // 作品提交
+        document
+          .getElementById("paintSubmit")
+          .addEventListener("click", function () {
+            if (ptSubmitted) return;
+            if (!ptHasInk || paintCanvasIsEmpty()) {
+              ptHasInk = false;
+              updatePaintSubmit();
+              showToast("请先在画布上绘制内容", "warn");
+              return;
+            }
+            showAudModal(
+              "提交作品",
+              "提交后画布将锁定，你的 " +
+                ptFragNo +
+                " 号分片将参与全场拼接合成，确认提交？",
+              function () {
+                ptSubmitted = true;
+                coPieces.push({
+                  fragment: ptFragNo,
+                  data: paintCanvas.toDataURL(),
+                  time: Date.now(),
+                });
+                paintCanvas.classList.add("locked");
+                document.getElementById("paintBadge").classList.add("show");
+                updatePaintSubmit();
+                showToast("✅ 作品提交成功，等待合成升空", "success");
+              },
+              "确认提交",
+            );
+          });
+
+        // 初始化尺寸（面板默认隐藏，rAF 后若仍隐藏则在切 Tab 时再执行）
+        requestAnimationFrame(sizePaintCanvas);
+        window.addEventListener("resize", sizePaintCanvas);
+        updatePaintSubmit();
+      }
+
+      /* 主办方重置（观众端无权限，仅调试模拟） */
+      function organizerResetPaint() {
+        if (!paintCanvas) return;
+        ptSubmitted = false;
+        ptHasInk = false;
+        ptDrawing = false;
+        clearPaintCanvas();
+        paintCanvas.classList.remove("locked");
+        document.getElementById("paintBadge").classList.remove("show");
+        rollPaintFragment();
+        updatePaintSubmit();
+        showToast("共创画布已刷新", "success");
+      }
+
+      /* ========== 初始化绑定 ========== */
+      document.addEventListener("DOMContentLoaded", function () {
+        // 弹幕模块初始化
+        initDanmu();
+        // AI 画图模块初始化
+        initPaint();
+
+        // 通用模态框按钮
+        document
+          .getElementById("modalCancel")
+          .addEventListener("click", hideAudModal);
+        document
+          .getElementById("modalOk")
+          .addEventListener("click", function () {
+            var cb = modalOkCb;
+            hideAudModal();
+            if (cb) cb();
+          });
+        document
+          .getElementById("modalOverlay")
+          .addEventListener("click", function (e) {
+            if (e.target === this) hideAudModal();
+          });
+
+        // Tab 切换
+        document.querySelectorAll(".tab-btn").forEach(function (b) {
+          b.addEventListener("click", function () {
+            switchTab(b.getAttribute("data-tab"));
+          });
+        });
+
+        // 信息按钮
+        document
+          .getElementById("infoBtn")
+          .addEventListener("click", function () {
+            showToast("蜂群星空互动 · 观众端 v1.0", "info");
+          });
+
+        // 调试面板切换
+        document
+          .getElementById("debugToggle")
+          .addEventListener("click", toggleDebugPanel);
+
+        // 调试面板 chips
+        document.addEventListener("click", function (e) {
+          var chip = e.target.closest(".debug-chip");
+          if (!chip) return;
+
+          var status = chip.getAttribute("data-status");
+          if (status === "activity") {
+            window.STATE.activityStatus = chip.getAttribute("data-val");
+            renderStatus();
+            return;
+          }
+          if (status === "network") {
+            window.STATE.networkStatus = chip.getAttribute("data-val");
+            renderStatus();
+            return;
+          }
+          var demo = chip.getAttribute("data-demo");
+          if (!demo) return;
+          if (demo === "toast-success") showToast("操作成功！", "success");
+          else if (demo === "toast-warn")
+            showToast("该内容包含敏感词，请修改后重试", "warn");
+          else if (demo === "toast-error")
+            showToast("发送失败，请检查网络", "error");
+          else if (demo === "toast-info") showToast("活动进行中", "info");
+          else if (demo === "loading") demoLoading(1500);
+          else if (demo === "paint-reset") organizerResetPaint();
+          else if (demo === "paint-reroll") {
+            rollPaintFragment();
+            showToast("已重新分配分片：" + ptFragNo + "/" + PT_TOTAL, "info");
+          }
+        });
+
+        // 首次渲染状态
+        renderStatus();
+      });
+    </script>
+  </body>
+</html>
