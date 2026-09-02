@@ -20,12 +20,29 @@ loop是标签名，1是标签值，让循环只执行一次
 
 HTML最基本的结构:
 
-<!doctype html>    声明文档类型为 HTML5
-<html>
+<!-- 声明文档类型为 HTML5 -->
+<!doctype html>
+<!--
+lang设置网页语言
+zh-CN简体中文
+zh-TW繁体中文
+zh中文
+en-US美国英语
+en-GB英国英语
+-->
+<html lang="zh-CN">
   <head>
-    <title>标题</title>    浏览器标签页标题
+    <!-- 告诉浏览器用什么编码 -->
+    <meta charset="UTF-8"/>
+    <!-- 浏览器标签页标题 -->
+    <title>标题</title>
   </head>
   <body>
-    内容    用户可见的内容区域
+    <!-- 内容    用户可见的内容区域 -->
   </body>
 </html>
+
+HTML中注释的写法：<!--注释内容-->
+
+如何设置网页图标？
+答：将要设置的网络图标放在与.html文件相同的文件夹下，若不适用link标签，则图片格式必须是.ico，图片名称必须是favicon
