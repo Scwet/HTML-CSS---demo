@@ -1240,11 +1240,29 @@
     </div>
 
     <script>
+      /* ========== 跨标签页通信（BroadcastChannel） ========== */
+      var commChannel = new BroadcastChannel('swarm_interact');
+      commChannel.onerror = function() { console.log('通信通道错误'); };
+
+      // 监听控制端状态同步
+      commChannel.onmessage = function(e) {
+        var msg = e.data;
+        if (msg.type === 'control') {
+          window.STATE.paintEnabled = msg.aiEnabled || msg.aiPaintEnabled;
+          window.STATE.danmuEnabled = msg.danmuEnabled !== false;
+          renderPaintLock();
+        } else if (msg.type === 'paint_reset') {
+          organizerResetPaint();
+        }
+      };
+
       /* ========== 全局状态（模拟） ========== */
       window.STATE = {
         activityStatus: "open", // 'open' | 'closed' | 'ended'
         networkStatus: "online", // 'online' | 'offline'
         currentTab: "danmu", // 'danmu' | 'paint'
+        paintEnabled: false,   // 由控制端开关控制
+        danmuEnabled: true,    // 由控制端弹幕开关控制
       };
 
       /* ========== Toast API ========== */
@@ -1367,6 +1385,30 @@
           if (el) el.classList.remove("show");
         });
         renderDebugChips();
+      }
+
+      /* ========== 控制端开关同步渲染 ========== */
+      function renderPaintLock() {
+        var lock = document.getElementById('paintLock');
+        if (lock) {
+          if (!window.STATE.paintEnabled) {
+            lock.classList.add('show');
+            lock.querySelector('.panel-lock-title').textContent = 'AI 画图活动暂未开启';
+            lock.querySelector('.panel-lock-desc').textContent = '请耐心等待，工作人员开启后即可绘制';
+          } else {
+            lock.classList.remove('show');
+          }
+        }
+        var danmuLock = document.getElementById('danmuLock');
+        if (danmuLock) {
+          if (!window.STATE.danmuEnabled) {
+            danmuLock.classList.add('show');
+            danmuLock.querySelector('.panel-lock-title').textContent = '弹幕互动暂未开启';
+            danmuLock.querySelector('.panel-lock-desc').textContent = '请耐心等待，工作人员开启后即可投稿';
+          } else {
+            danmuLock.classList.remove('show');
+          }
+        }
       }
 
       /* ========== Tab 切换 ========== */
@@ -1575,6 +1617,14 @@
           1200 + Math.floor(Math.random() * 300) + mySubmissions.length;
         showQueue(queueNo);
         showToast("✅ 弹幕投稿成功，正在排队升空展示", "success");
+
+        // 发送到控制端
+        commChannel.postMessage({
+          type: 'danmu',
+          text: text,
+          time: now,
+          queueNo: queueNo
+        });
 
         // 清空输入
         danmuInput.value = "";
@@ -1957,6 +2007,10 @@
           .getElementById("paintSubmit")
           .addEventListener("click", function () {
             if (ptSubmitted) return;
+            if (!window.STATE.paintEnabled) {
+              showToast("画图活动暂未开启，请等待", "warn");
+              return;
+            }
             if (!ptHasInk || paintCanvasIsEmpty()) {
               ptHasInk = false;
               updatePaintSubmit();
@@ -1979,6 +2033,14 @@
                 document.getElementById("paintBadge").classList.add("show");
                 updatePaintSubmit();
                 showToast("✅ 作品提交成功，等待合成升空", "success");
+
+                // 发送画布数据到控制端
+                commChannel.postMessage({
+                  type: 'paint',
+                  fragment: ptFragNo,
+                  data: paintCanvas.toDataURL(),
+                  time: Date.now()
+                });
               },
               "确认提交",
             );
@@ -2081,6 +2143,8 @@
 
         // 首次渲染状态
         renderStatus();
+        // 初始化控制端开关同步状态
+        renderPaintLock();
       });
     </script>
   </body>

@@ -2123,6 +2123,145 @@
     </div>
 
     <script>
+      // ===== 跨标签页通信（BroadcastChannel） =====
+      var commChannel = new BroadcastChannel('swarm_interact');
+      var danmuMessages = []; // 存储收到的弹幕
+      var paintMessages = []; // 存储收到的画图作品
+
+      // 控制端互动状态
+      var controlState = {
+        danmuEnabled: true,
+        aiEnabled: false,
+        aiPaintEnabled: false
+      };
+
+      function syncControlState() {
+        commChannel.postMessage({
+          type: 'control',
+          danmuEnabled: controlState.danmuEnabled,
+          aiEnabled: controlState.aiEnabled,
+          aiPaintEnabled: controlState.aiPaintEnabled
+        });
+      }
+
+      // 监听观众端消息
+      commChannel.onmessage = function(e) {
+        var msg = e.data;
+        if (msg.type === 'danmu') {
+          danmuMessages.push(msg);
+          renderDanmuPreview();
+          showToast('收到弹幕: ' + msg.text);
+        } else if (msg.type === 'paint') {
+          paintMessages.push(msg);
+          renderPaintPreview(msg);
+          showToast('收到画图作品 #' + msg.fragment);
+        }
+      };
+
+      // 渲染弹幕预览
+      function renderDanmuPreview() {
+        var box = document.querySelector('[data-page="interact"] .preview-box');
+        if (!box) return;
+        if (danmuMessages.length === 0) {
+          box.innerHTML = '📡 弹幕预览窗口';
+          return;
+        }
+        var html = '<div style="text-align:left;max-height:120px;overflow-y:auto;">';
+        var recent = danmuMessages.slice(-5).reverse();
+        recent.forEach(function(m) {
+          var time = new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+          html += '<div style="margin:4px 0;padding:6px 10px;background:rgba(79,172,254,0.15);border-radius:8px;font-size:12px;display:flex;justify-content:space-between;">';
+          html += '<span>💬 ' + m.text + '</span>';
+          html += '<span style="color:rgba(232,236,244,0.5);font-size:10px;">' + time + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+        html += '<div style="font-size:11px;color:rgba(232,236,244,0.4);margin-top:6px;">共收到 ' + danmuMessages.length + ' 条弹幕</div>';
+        box.innerHTML = html;
+      }
+
+      // 渲染画图预览（增量绘制，不重复创建Canvas）
+      var previewCanvas = null;
+      var previewCtx = null;
+
+      function ensurePreviewCanvas(box) {
+        if (previewCanvas && previewCanvas.parentElement === box) return;
+        previewCanvas = document.createElement('canvas');
+        previewCanvas.width = 240;
+        previewCanvas.height = 180;
+        previewCanvas.style.maxWidth = '100%';
+        previewCanvas.style.borderRadius = '8px';
+        previewCtx = previewCanvas.getContext('2d');
+        previewCtx.fillStyle = '#1a2236';
+        previewCtx.fillRect(0, 0, 240, 180);
+        // 绘制网格占位
+        var cols = 2, cellW = 110, cellH = 80, padding = 5;
+        for (var i = 0; i < 4; i++) {
+          var col = i % cols, row = Math.floor(i / cols);
+          var gx = col * (cellW + padding) + padding;
+          var gy = row * (cellH + padding) + padding;
+          previewCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+          previewCtx.lineWidth = 1;
+          previewCtx.setLineDash([4, 3]);
+          previewCtx.strokeRect(gx, gy, cellW, cellH);
+          previewCtx.setLineDash([]);
+        }
+        box.innerHTML = '';
+        box.appendChild(previewCanvas);
+      }
+
+      function renderPaintPreview(msg) {
+        var boxes = document.querySelectorAll('[data-page="interact"] .preview-box');
+        var box = boxes[1];
+        if (!box) return;
+        if (paintMessages.length === 0) {
+          box.innerHTML = '🎨 画布预览（观众作品拼接）';
+          previewCanvas = null;
+          previewCtx = null;
+          return;
+        }
+        ensurePreviewCanvas(box);
+        // 只绘制最新一条消息的分片
+        var cols = 2, cellW = 110, cellH = 80, padding = 5;
+        var idx = paintMessages.length - 1;
+        var col = idx % cols;
+        var row = Math.floor(idx / cols);
+        var x = col * (cellW + padding) + padding;
+        var y = row * (cellH + padding) + padding;
+        // 清除该格子背景
+        previewCtx.fillStyle = '#1a2236';
+        previewCtx.fillRect(x, y, cellW, cellH);
+        // 加载并绘制图像（先铺白色底色，保证透明背景可见）
+        var img = new Image();
+        img.onload = function() {
+          previewCtx.fillStyle = '#ffffff';
+          previewCtx.fillRect(x + 2, y + 16, cellW - 4, cellH - 20);
+          var ratio = Math.min((cellW - 8) / img.width, (cellH - 24) / img.height);
+          var dw = img.width * ratio;
+          var dh = img.height * ratio;
+          var dx = x + (cellW - dw) / 2;
+          var dy = y + 18 + (cellH - 24 - dh) / 2;
+          previewCtx.drawImage(img, dx, dy, dw, dh);
+          previewCtx.strokeStyle = '#4facfe';
+          previewCtx.lineWidth = 2;
+          previewCtx.setLineDash([]);
+          previewCtx.strokeRect(x, y, cellW, cellH);
+          previewCtx.fillStyle = '#fff';
+          previewCtx.font = 'bold 10px sans-serif';
+          previewCtx.fillText('#' + msg.fragment, x + 4, y + 12);
+        };
+        img.src = msg.data;
+        // 更新计数
+        var info = box.querySelector('.paint-count-info');
+        if (!info) {
+          info = document.createElement('div');
+          info.className = 'paint-count-info';
+          info.style.cssText = 'font-size:11px;color:rgba(232,236,244,0.4);margin-top:6px;';
+          box.appendChild(info);
+        }
+        info.textContent = '共收到 ' + paintMessages.length + ' 份作品';
+      }
+
       // ===== 状态栏时钟（原生 JS，无外部库） =====
       var clock = document.getElementById("clock");
       function updateClock() {
@@ -2291,6 +2430,23 @@
         var t = e.target.closest(".toggle");
         if (!t) return;
         t.classList.toggle("on");
+        var role = t.getAttribute("data-role");
+        if (role === "danmu") {
+          controlState.danmuEnabled = t.classList.contains("on");
+          syncControlState();
+          showToast(controlState.danmuEnabled ? "弹幕表演已开启" : "弹幕表演已关闭");
+        } else if (role === "ai") {
+          controlState.aiEnabled = t.classList.contains("on");
+          syncControlState();
+          showToast(controlState.aiEnabled ? "AI 画图已开启" : "AI 画图已关闭");
+        } else if (role === "aiMode") {
+          controlState.aiPaintEnabled = t.classList.contains("on");
+          syncControlState();
+          showToast(controlState.aiPaintEnabled ? "AI 画图模式已开启" : "AI 画图模式已关闭");
+        } else if (role === "danmuMaster") {
+          controlState.danmuEnabled = t.classList.contains("on");
+          syncControlState();
+        }
       });
 
       // ===== 通用：模态框 showModal(title, msg, callback) =====
@@ -2509,7 +2665,18 @@
       var aiLaunch = document.getElementById("aiLaunch");
       if (aiReset) {
         aiReset.addEventListener("click", function () {
+          if (paintMessages.length === 0) {
+            showToast("当前没有观众作品可重置");
+            return;
+          }
           showModal("重置画布", "将清空所有观众作品，确认继续？", function () {
+            paintMessages = [];
+            commChannel.postMessage({ type: 'paint_reset' });
+            var boxes = document.querySelectorAll('[data-page="interact"] .preview-box');
+            if (boxes[1]) boxes[1].innerHTML = '🎨 画布预览（观众作品拼接）';
+            previewCanvas = null;
+            previewCtx = null;
+            previewDrawnFragments = {};
             showToast("画布已重置");
           });
         });
@@ -2523,9 +2690,13 @@
             showToast("请先开启 AI 画图模式");
             return;
           }
+          if (paintMessages.length === 0) {
+            showToast("暂无观众作品，请等待作品提交后再升空");
+            return;
+          }
           showModal(
             "确认升空",
-            "AI 拼接图案将投放至空域表演，确认？",
+            "当前已收到 " + paintMessages.length + " 份观众作品，AI 拼接图案将投放至空域表演，确认？",
             function () {
               showToast("AI 图案已升空表演");
             },
